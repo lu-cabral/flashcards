@@ -1,0 +1,483 @@
+class FlashcardManager {
+    constructor() {
+        this.groups = [];
+        this.flashcards = [];
+        this.currentGroup = null;
+        this.currentFlashcard = null;
+        this.editingGroup = null;
+        this.editingFlashcard = null;
+        this.initializeElements();
+        this.bindEvents();
+        this.loadGroups();
+    }
+
+    initializeElements() {
+        // Modais
+        this.flashcardModal = document.getElementById('flashcardModal');
+        this.groupModal = document.getElementById('groupModal');
+        
+        // Formulários
+        this.flashcardForm = document.getElementById('flashcardForm');
+        this.groupForm = document.getElementById('groupForm');
+        
+        // Botões
+        this.addFlashcardBtn = document.getElementById('addFlashcard');
+        this.addGroupBtn = document.getElementById('addGroup');
+        this.cancelFlashcardBtn = document.getElementById('cancelButton');
+        this.cancelGroupBtn = document.getElementById('cancelGroupButton');
+        this.backToGroupsBtn = document.getElementById('backToGroups');
+        this.addReviewDateBtn = document.getElementById('addReviewDate');
+        
+        // Containers
+        this.groupsList = document.getElementById('groupsList');
+        this.flashcardsList = document.getElementById('flashcardsList');
+        this.flashcardDisplay = document.getElementById('flashcardDisplay');
+        
+        // Outros elementos
+        this.currentGroupName = document.getElementById('currentGroupName');
+        this.reviewDatesContainer = document.getElementById('reviewDatesContainer');
+    }
+
+    bindEvents() {
+        // Eventos dos modais
+        this.addFlashcardBtn?.addEventListener('click', () => this.openModal('flashcard'));
+        this.addGroupBtn?.addEventListener('click', () => this.openModal('group'));
+        this.cancelFlashcardBtn?.addEventListener('click', () => this.closeModal('flashcard'));
+        this.cancelGroupBtn?.addEventListener('click', () => this.closeModal('group'));
+        this.backToGroupsBtn?.addEventListener('click', () => this.showGroups());
+        
+        // Eventos dos formulários
+        this.flashcardForm?.addEventListener('submit', (e) => this.handleFlashcardSubmit(e));
+        this.groupForm?.addEventListener('submit', (e) => this.handleGroupSubmit(e));
+        
+        // Eventos do botão de data de revisão
+        if (this.addReviewDateBtn) {
+            this.addReviewDateBtn.addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.type = 'date';
+                input.className = 'review-date-input';
+                this.reviewDatesContainer.appendChild(input);
+            });
+        }
+    }
+
+    async loadGroups() {
+        try {
+            const response = await fetch('/groups');
+            this.groups = await response.json();
+            this.updateGroupsList();
+        } catch (error) {
+            console.error('Erro ao carregar grupos:', error);
+        }
+    }
+
+    async loadGroupFlashcards(groupId) {
+        try {
+            const response = await fetch(`/groups/${groupId}/flashcards`);
+            const files = await response.json();
+            
+            this.flashcards = [];
+            for (const file of files) {
+                const flashcardResponse = await fetch(`/flashcards/${groupId}/${file}`);
+                const flashcard = await flashcardResponse.json();
+                this.flashcards.push(flashcard);
+            }
+            
+            this.updateFlashcardsList();
+        } catch (error) {
+            console.error('Erro ao carregar flashcards:', error);
+        }
+    }
+
+    openModal(type) {
+        if (type === 'flashcard') {
+            this.flashcardModal.classList.add('active');
+        } else {
+            this.groupModal.classList.add('active');
+        }
+    }
+
+    closeModal(type) {
+        if (type === 'flashcard') {
+            this.flashcardModal.classList.remove('active');
+            this.flashcardForm.reset();
+            this.editingFlashcard = null;
+        } else {
+            this.groupModal.classList.remove('active');
+            this.groupForm.reset();
+            this.editingGroup = null;
+        }
+    }
+
+    async handleGroupSubmit(e) {
+        e.preventDefault();
+        const name = document.getElementById('groupName').value;
+        const description = document.getElementById('groupDescription').value;
+        const colorInput = document.getElementById('groupColor');
+        const color = colorInput && colorInput.value ? colorInput.value : '#4a90e2';
+
+        let group, url, method;
+        
+        if (this.editingGroup) {
+            const id = document.getElementById('groupId').value;
+            group = {
+                ...this.editingGroup,
+                name,
+                description,
+                color,
+                id
+            };
+            url = `/groups/${id}`;
+            method = 'PUT';
+        } else {
+            group = {
+                name,
+                description,
+                color,
+                dateCreated: new Date().toISOString()
+            };
+            url = '/groups';
+            method = 'POST';
+        }
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(group)
+            });
+            
+            if (response.ok) {
+                const savedGroup = await response.json();
+                if (this.editingGroup) {
+                    const idx = this.groups.findIndex(g => g.id === savedGroup.id);
+                    if (idx !== -1) {
+                        this.groups[idx] = savedGroup;
+                    }
+                    await this.loadGroups();
+                } else {
+                    this.groups.push(savedGroup);
+                }
+                this.updateGroupsList();
+                this.closeModal('group');
+            } else {
+                alert('Erro ao salvar grupo.');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar grupo:', error);
+            alert('Erro ao salvar grupo.');
+        }
+    }
+
+    async handleFlashcardSubmit(e) {
+        e.preventDefault();
+        
+        const title = document.getElementById('flashcardTitle').value;
+        const front = document.getElementById('flashcardFront').value;
+        const back = document.getElementById('flashcardBack').value;
+        
+        const reviewDateInputs = document.querySelectorAll('.review-date-input');
+        const reviewDates = Array.from(reviewDateInputs).map(input => input.value).filter(Boolean);
+
+        let flashcard, url, method;
+        
+        if (this.editingFlashcard) {
+            flashcard = {
+                ...this.editingFlashcard,
+                title,
+                front,
+                back,
+                reviewDates
+            };
+            url = `/groups/${this.currentGroup.id}/flashcards/${flashcard.id}`;
+            method = 'PUT';
+        } else {
+            flashcard = {
+                id: Date.now(),
+                title,
+                front,
+                back,
+                groupId: this.currentGroup.id,
+                reviewDates,
+                dateCreated: new Date().toISOString()
+            };
+            url = `/groups/${this.currentGroup.id}/flashcards`;
+            method = 'POST';
+        }
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(flashcard)
+            });
+            
+            if (response.ok) {
+                if (this.editingFlashcard) {
+                    const idx = this.flashcards.findIndex(f => f.id === flashcard.id);
+                    if (idx !== -1) {
+                        this.flashcards[idx] = flashcard;
+                    }
+                } else {
+                    this.flashcards.push(flashcard);
+                }
+                this.updateFlashcardsList();
+                this.closeModal('flashcard');
+            } else {
+                alert('Erro ao salvar flashcard.');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar flashcard:', error);
+            alert('Erro ao salvar flashcard.');
+        }
+    }
+
+    openEditGroupModal(group) {
+        this.editingGroup = group;
+        this.groupModal.classList.add('active');
+        document.getElementById('groupName').value = group.name;
+        document.getElementById('groupDescription').value = group.description || '';
+        const colorInput = document.getElementById('groupColor');
+        colorInput.value = group.color || '#4a90e2';
+        colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('groupId').value = group.id;
+    }
+
+    openEditFlashcardModal(flashcard) {
+        this.editingFlashcard = flashcard;
+        this.flashcardModal.classList.add('active');
+        document.getElementById('flashcardTitle').value = flashcard.title;
+        document.getElementById('flashcardFront').value = flashcard.front;
+        document.getElementById('flashcardBack').value = flashcard.back;
+
+        const container = document.getElementById('reviewDatesContainer');
+        container.innerHTML = '';
+
+        if (flashcard.reviewDates && flashcard.reviewDates.length) {
+            flashcard.reviewDates.forEach(date => {
+                const input = document.createElement('input');
+                input.type = 'date';
+                input.className = 'review-date-input';
+                input.value = date;
+                container.appendChild(input);
+            });
+        } else {
+            const input = document.createElement('input');
+            input.type = 'date';
+            input.className = 'review-date-input';
+            container.appendChild(input);
+        }
+    }
+
+    updateGroupsList() {
+        this.groupsList.innerHTML = '';
+        
+        this.groups.forEach(group => {
+            const groupElement = document.createElement('div');
+            groupElement.className = 'group-item';
+            groupElement.style.borderTop = `8px solid ${group.color || '#4a90e2'}`;
+            groupElement.innerHTML = `
+                <i class="fas fa-folder" style="color:${group.color || '#4a90e2'}"></i>
+                <h3>${group.name}</h3>
+                <p>${group.description || 'Sem descrição'}</p>
+                <span class="card-count">${group.cardCount || 0} cards</span>
+                <div class="group-actions">
+                    <button class="edit-group-btn" title="Editar Grupo"><i class="fas fa-edit"></i></button>
+                    <button class="delete-group-btn" title="Excluir Grupo"><i class="fas fa-trash"></i></button>
+                </div>
+            `;
+
+            groupElement.addEventListener('click', (e) => {
+                // Evita abrir o grupo ao clicar nos botões
+                if (e.target.closest('.edit-group-btn') || e.target.closest('.delete-group-btn')) {
+                    return;
+                }
+                this.openGroup(group);
+            });
+
+            groupElement.querySelector('.edit-group-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openEditGroupModal(group);
+            });
+
+            groupElement.querySelector('.delete-group-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm('Tem certeza que deseja excluir este grupo? Todos os flashcards serão removidos.')) {
+                    this.deleteGroup(group.id);
+                }
+            });
+
+            this.groupsList.appendChild(groupElement);
+        });
+    }
+
+    updateFlashcardsList() {
+        this.flashcardsList.innerHTML = '';
+        
+        this.flashcards.forEach(flashcard => {
+            const flashcardElement = document.createElement('div');
+            flashcardElement.className = 'flashcard-item';
+            
+            const color = this.currentGroup && this.currentGroup.color ? this.currentGroup.color : '#4a90e2';
+            flashcardElement.style.borderTop = `8px solid ${color}`;
+            
+            flashcardElement.innerHTML = `
+                <div class="flashcard-front">
+                    <div class="flashcard-actions">
+                        <button class="edit-flashcard-btn" title="Editar Flashcard"><i class="fas fa-edit"></i></button>
+                        <button class="delete-flashcard-btn" title="Excluir Flashcard"><i class="fas fa-trash"></i></button>
+                    </div>
+                    <div class="flashcard-title">${flashcard.title}</div>
+                    <div class="flashcard-content">${flashcard.front}</div>
+                    ${flashcard.reviewDates && flashcard.reviewDates.length ? 
+                        `<div class="review-dates"><strong>Revisões:</strong> ${flashcard.reviewDates.map(d => `<span>${d}</span>`).join(', ')}</div>` : 
+                        ''}
+                </div>
+                <div class="flashcard-back">
+                    <div class="flashcard-title">${flashcard.title}</div>
+                    <div class="flashcard-content">${flashcard.back}</div>
+                    ${flashcard.reviewDates && flashcard.reviewDates.length ? 
+                        `<div class="review-dates"><strong>Revisões:</strong> ${flashcard.reviewDates.map(d => `<span>${d}</span>`).join(', ')}</div>` : 
+                        ''}
+                </div>
+            `;
+
+            flashcardElement.addEventListener('click', (e) => {
+                if (!e.target.closest('.flashcard-actions')) {
+                    flashcardElement.classList.toggle('flipped');
+                }
+            });
+
+            flashcardElement.querySelector('.edit-flashcard-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openEditFlashcardModal(flashcard);
+            });
+
+            flashcardElement.querySelector('.delete-flashcard-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm('Tem certeza que deseja excluir este flashcard?')) {
+                    this.deleteFlashcard(flashcard.id);
+                }
+            });
+
+            this.flashcardsList.appendChild(flashcardElement);
+        });
+    }
+
+    openGroup(group) {
+        this.currentGroup = group;
+        this.groupsList.style.display = 'none';
+        this.flashcardsList.style.display = 'grid';
+        this.flashcardDisplay.style.display = 'none';
+        this.addGroupBtn.style.display = 'none';
+        this.addFlashcardBtn.style.display = 'flex';
+        this.backToGroupsBtn.style.display = 'flex';
+        this.currentGroupName.textContent = group.name;
+        
+        this.loadGroupFlashcards(group.id);
+    }
+
+    showGroups() {
+        this.currentGroup = null;
+        this.groupsList.style.display = 'grid';
+        this.flashcardsList.style.display = 'none';
+        this.flashcardDisplay.style.display = 'none';
+        this.addGroupBtn.style.display = 'flex';
+        this.addFlashcardBtn.style.display = 'none';
+        this.backToGroupsBtn.style.display = 'none';
+        this.currentGroupName.textContent = '';
+    }
+
+    displayFlashcard(flashcard) {
+        this.currentFlashcard = flashcard;
+        this.flashcardDisplay.style.display = 'block';
+        
+        const flashcardElement = document.createElement('div');
+        flashcardElement.className = 'flashcard';
+        flashcardElement.innerHTML = `
+            <div class="flashcard-front">
+                <h3>${flashcard.title}</h3>
+                <p>${flashcard.front}</p>
+            </div>
+            <div class="flashcard-back">
+                <h3>${flashcard.title}</h3>
+                <p>${flashcard.back}</p>
+            </div>
+        `;
+        
+        flashcardElement.addEventListener('click', () => {
+            flashcardElement.classList.toggle('flipped');
+        });
+
+        this.flashcardDisplay.innerHTML = '';
+        this.flashcardDisplay.appendChild(flashcardElement);
+    }
+
+    async deleteGroup(groupId) {
+        try {
+            const response = await fetch(`/groups/${groupId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                this.groups = this.groups.filter(g => g.id !== groupId);
+                this.updateGroupsList();
+                if (this.currentGroup && this.currentGroup.id === groupId) {
+                    this.flashcardsList.innerHTML = '';
+                    this.currentGroup = null;
+                    this.showGroups();
+                }
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Erro ao excluir grupo.');
+            }
+        } catch (error) {
+            console.error('Erro ao excluir grupo:', error);
+            alert('Erro ao excluir grupo.');
+        }
+    }
+
+    async deleteFlashcard(flashcardId) {
+        if (!this.currentGroup) {
+            alert('Nenhum grupo selecionado.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/groups/${this.currentGroup.id}/flashcards/${flashcardId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                this.flashcards = this.flashcards.filter(f => f.id !== flashcardId);
+                this.updateFlashcardsList();
+                const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
+                if (groupIndex !== -1) {
+                    this.groups[groupIndex].cardCount = (this.groups[groupIndex].cardCount || 1) - 1;
+                    this.updateGroupsList();
+                }
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Erro ao excluir flashcard.');
+            }
+        } catch (error) {
+            console.error('Erro ao excluir flashcard:', error);
+            alert('Erro ao excluir flashcard.');
+        }
+    }
+}
+
+// Inicializar o gerenciador de flashcards quando a página carregar
+document.addEventListener('DOMContentLoaded', () => {
+    new FlashcardManager();
+});

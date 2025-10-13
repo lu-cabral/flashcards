@@ -1,18 +1,3 @@
-// Rota para editar grupo existente
-app.put('/groups/:id', async (req, res) => {
-    try {
-        const groupId = req.params.id;
-        const group = req.body;
-        await fs.writeFile(
-            path.join(__dirname, 'groups', `${groupId}.json`),
-            JSON.stringify(group, null, 2)
-        );
-        res.json(group);
-    } catch (error) {
-        console.error('Erro ao editar grupo:', error);
-        res.status(500).json({ error: 'Erro ao editar grupo' });
-    }
-});
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
@@ -24,9 +9,23 @@ const PORT = 3000;
 app.use(express.static(path.join(__dirname)));
 app.use(express.json());
 
-// Criar diretório de grupos se não existir
+// Criar diretórios necessários se não existirem
 const groupsDir = path.join(__dirname, 'groups');
-fs.mkdir(groupsDir, { recursive: true }).catch(console.error);
+const flashcardsDir = path.join(__dirname, 'flashcards');
+
+// Garante que os diretórios existam antes de iniciar o servidor
+async function initializeDirs() {
+    try {
+        await fs.mkdir(groupsDir, { recursive: true });
+        await fs.mkdir(flashcardsDir, { recursive: true });
+        console.log('Diretórios inicializados com sucesso');
+    } catch (error) {
+        console.error('Erro ao criar diretórios:', error);
+    }
+}
+
+// Inicializa os diretórios antes de configurar as rotas
+initializeDirs();
 
 // Rota para obter a lista de grupos
 app.get('/groups', async (req, res) => {
@@ -55,6 +54,27 @@ app.get('/groups', async (req, res) => {
     } catch (error) {
         console.error('Erro ao ler grupos:', error);
         res.status(500).json({ error: 'Erro ao ler grupos' });
+    }
+});
+
+// Rota para editar grupo existente
+app.put('/groups/:id', async (req, res) => {
+    try {
+        const groupId = req.params.id;
+        const group = req.body;
+        
+        if (!group || !groupId) {
+            return res.status(400).json({ error: 'Dados do grupo inválidos' });
+        }
+
+        await fs.writeFile(
+            path.join(__dirname, 'groups', `${groupId}.json`),
+            JSON.stringify(group, null, 2)
+        );
+        res.json(group);
+    } catch (error) {
+        console.error('Erro ao editar grupo:', error);
+        res.status(500).json({ error: 'Erro ao editar grupo' });
     }
 });
 
@@ -94,9 +114,26 @@ app.get('/groups/:groupId/flashcards', async (req, res) => {
 // Rota para obter um flashcard específico
 app.get('/flashcards/:id', async (req, res) => {
     try {
-        const filePath = path.join(__dirname, 'flashcards', req.params.id);
-        const content = await fs.readFile(filePath, 'utf-8');
-        res.json(JSON.parse(content));
+        const id = req.params.id;
+        
+        // Search for the flashcard in all group directories
+        const groupDirs = await fs.readdir(flashcardsDir);
+        for (const groupDir of groupDirs) {
+            const groupPath = path.join(flashcardsDir, groupDir);
+            const stats = await fs.stat(groupPath);
+            if (!stats.isDirectory()) continue;
+            
+            const flashcardPath = path.join(groupPath, `${id}.json`);
+            try {
+                const content = await fs.readFile(flashcardPath, 'utf-8');
+                return res.json(JSON.parse(content));
+            } catch (e) {
+                // Continue searching if not found in this group
+                continue;
+            }
+        }
+        // If we get here, the flashcard wasn't found in any group
+        throw new Error('Flashcard not found');
     } catch (error) {
         console.error('Erro ao ler flashcard:', error);
         res.status(404).json({ error: 'Flashcard não encontrado' });
@@ -120,6 +157,71 @@ app.post('/groups/:groupId/flashcards', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+// Rota para editar flashcard existente
+app.put('/groups/:groupId/flashcards/:flashcardId', async (req, res) => {
+    try {
+        const { groupId, flashcardId } = req.params;
+        const flashcard = req.body;
+        await fs.writeFile(
+            path.join(__dirname, 'flashcards', groupId, `${flashcardId}.json`),
+            JSON.stringify(flashcard, null, 2)
+        );
+        res.json(flashcard);
+    } catch (error) {
+        console.error('Erro ao editar flashcard:', error);
+        res.status(500).json({ error: 'Erro ao editar flashcard' });
+    }
+});
+
+// Rota para excluir grupo
+app.delete('/groups/:id', async (req, res) => {
+    try {
+        const groupId = req.params.id;
+        // Excluir arquivo do grupo
+        await fs.unlink(path.join(__dirname, 'groups', `${groupId}.json`));
+        
+        // Excluir pasta de flashcards do grupo
+        const flashcardsDir = path.join(__dirname, 'flashcards', groupId);
+        try {
+            const files = await fs.readdir(flashcardsDir);
+            // Excluir todos os flashcards do grupo
+            for (const file of files) {
+                await fs.unlink(path.join(flashcardsDir, file));
+            }
+            // Excluir o diretório vazio
+            await fs.rmdir(flashcardsDir);
+        } catch (err) {
+            console.error('Erro ao excluir flashcards:', err);
+            // Ignora erro se o diretório não existir
+        }
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao excluir grupo:', error);
+        res.status(500).json({ error: 'Erro ao excluir grupo' });
+    }
+});
+
+// Rota para excluir flashcard
+app.delete('/groups/:groupId/flashcards/:flashcardId', async (req, res) => {
+    try {
+        const { groupId, flashcardId } = req.params;
+        await fs.unlink(path.join(__dirname, 'flashcards', groupId, `${flashcardId}.json`));
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erro ao excluir flashcard:', error);
+        res.status(500).json({ error: 'Erro ao excluir flashcard' });
+    }
+});
+
+// Verifica se a porta está disponível antes de iniciar o servidor
+const server = app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
+}).on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`A porta ${PORT} já está em uso. Tente encerrar outros processos ou usar uma porta diferente.`);
+    } else {
+        console.error('Erro ao iniciar o servidor:', error);
+    }
+    process.exit(1);
 });

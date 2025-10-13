@@ -30,12 +30,46 @@
                 </div>
             </div>
             
+            <div class="review-filters" id="filters">
+                <button class="filter-button active" data-filter="all">
+                    <i class="fas fa-layer-group"></i>
+                    Todos
+                    <span class="count">0</span>
+                </button>
+                <button class="filter-button" data-filter="today">
+                    <i class="fas fa-clock"></i>
+                    Hoje
+                    <span class="count">0</span>
+                </button>
+                <button class="filter-button" data-filter="week">
+                    <i class="fas fa-calendar-week"></i>
+                    Esta Semana
+                    <span class="count">0</span>
+                </button>
+                <button class="filter-button" data-filter="month">
+                    <i class="fas fa-calendar-alt"></i>
+                    Este Mês
+                    <span class="count">0</span>
+                </button>
+                <button class="filter-button" data-filter="overdue">
+                    <i class="fas fa-exclamation-circle"></i>
+                    Vencidos
+                    <span class="count">0</span>
+                </button>
+            </div>
+
             <div class="groups-grid" id="groupsList">
                 <!-- Grupos serão listados aqui -->
             </div>
             
-            <div class="flashcards-grid" id="flashcardsList" style="display: none;">
-                <!-- Flashcards serão listados aqui -->
+            <div id="flashcardsContainer" style="display: none;">
+                <div class="flashcards-grid" id="flashcardsList">
+                    <!-- Flashcards serão listados aqui -->
+                </div>
+            </div>
+                <div class="flashcards-grid" id="flashcardsList">
+                    <!-- Flashcards serão listados aqui -->
+                </div>
             </div>
             
             <div class="flashcard-display" id="flashcardDisplay" style="display: none;">
@@ -49,6 +83,7 @@
         <div class="modal-content">
             <h2>Criar Grupo</h2>
             <form id="groupForm">
+                <input type="hidden" id="groupId">
                 <div class="form-group">
                     <label for="groupName">Nome do Grupo:</label>
                     <input type="text" id="groupName" required>
@@ -59,10 +94,10 @@
                 </div>
                 <div class="form-group">
                     <label for="groupColor">Cor do Grupo:</label>
-                    <input type="color" id="groupColor" value="#4a90e2" style="width: 50px; height: 32px; border: none;">
+                    <input type="color" id="groupColor" name="groupColor" value="#4a90e2" style="width: 50px; height: 32px; border: none;">
                 </div>
                 <div class="modal-buttons">
-                    <button type="submit" class="save-button">Salvar</button>
+                    <button type="submit" class="save-button" id="saveGroupButton">Salvar</button>
                     <button type="button" class="cancel-button" id="cancelGroupButton">Cancelar</button>
                 </div>
             </form>
@@ -85,6 +120,13 @@
                 <div class="form-group">
                     <label for="flashcardBack">Verso:</label>
                     <textarea id="flashcardBack" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="flashcardReviewDates">Datas de Revisão:</label>
+                    <div id="reviewDatesContainer">
+                        <input type="date" class="review-date-input">
+                    </div>
+                    <button type="button" id="addReviewDate" style="margin-top:8px;">Adicionar outra data</button>
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="save-button">Salvar</button>
