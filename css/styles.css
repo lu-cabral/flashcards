@@ -582,3 +582,61 @@ body {
 .delete-group-btn i {
     font-size: 16px;
 }
+
+/* Botões de ação dos flashcards */
+.flashcard-actions {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    gap: 6px;
+    z-index: 3;
+}
+
+.edit-flashcard-btn,
+.delete-flashcard-btn {
+    background: white;
+    border: 1px solid #eee;
+    cursor: pointer;
+    font-size: 12px;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    opacity: 0.8;
+}
+
+.edit-flashcard-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.delete-flashcard-btn:hover {
+    background: #d9534f;
+    color: white;
+    border-color: #d9534f;
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.edit-flashcard-btn i,
+.delete-flashcard-btn i {
+    font-size: 12px;
+}
+
+/* Mostrar botões apenas no hover do flashcard */
+.flashcard-item .flashcard-actions {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.flashcard-item:hover .flashcard-actions {
+    opacity: 1;
+}

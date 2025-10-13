@@ -206,7 +206,10 @@ app.delete('/groups/:id', async (req, res) => {
 app.delete('/groups/:groupId/flashcards/:flashcardId', async (req, res) => {
     try {
         const { groupId, flashcardId } = req.params;
-        await fs.unlink(path.join(__dirname, 'flashcards', groupId, `${flashcardId}.json`));
+        console.log('Tentando excluir flashcard:', flashcardId, 'do grupo:', groupId);
+        const filePath = path.join(__dirname, 'flashcards', groupId, `${flashcardId}.json`);
+        console.log('Caminho do arquivo:', filePath);
+        await fs.unlink(filePath);
         res.json({ success: true });
     } catch (error) {
         console.error('Erro ao excluir flashcard:', error);

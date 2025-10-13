@@ -405,7 +405,7 @@ class FlashcardManager {
             method = 'PUT';
         } else {
             flashcard = {
-                id: Date.now(),
+                id: Date.now().toString(),
                 title,
                 front,
                 back,
@@ -432,8 +432,21 @@ class FlashcardManager {
                     if (idx !== -1) {
                         this.flashcards[idx] = flashcard;
                     }
+                    // Atualizar também no array global
+                    const globalIdx = this.allFlashcards.findIndex(f => f.id === flashcard.id);
+                    if (globalIdx !== -1) {
+                        this.allFlashcards[globalIdx] = flashcard;
+                    }
                 } else {
                     this.flashcards.push(flashcard);
+                    // Adicionar também ao array global
+                    this.allFlashcards.push(flashcard);
+                    // Atualizar contagem do grupo
+                    const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
+                    if (groupIndex !== -1) {
+                        this.groups[groupIndex].cardCount = (this.groups[groupIndex].cardCount || 0) + 1;
+                        this.updateGroupsList();
+                    }
                 }
                 this.updateFlashcardsList();
                 this.closeModal('flashcard');
@@ -616,7 +629,7 @@ class FlashcardManager {
             groupItem.innerHTML = `
                 <i class="fas fa-folder" style="color:${group.color || '#4a90e2'}"></i>
                 <h3>${group.name}</h3>
-                <p>${group.description || 'Sem descrição'}</p>
+                ${group.description ? `<p>${group.description}</p>` : ''}
                 <span class="card-count">${filteredCount} cards${this.currentFilter !== 'all' ? ' filtrados' : ''}</span>
                 <div class="group-actions">
                     <button class="edit-group-btn" title="Editar Grupo"><i class="fas fa-edit"></i></button>
@@ -670,11 +683,9 @@ class FlashcardManager {
                         <button class="edit-flashcard-btn" title="Editar Flashcard"><i class="fas fa-edit"></i></button>
                         <button class="delete-flashcard-btn" title="Excluir Flashcard"><i class="fas fa-trash"></i></button>
                     </div>
-                    <div class="flashcard-title">${flashcard.title}</div>
                     <div class="flashcard-content">${flashcard.front}</div>
                 </div>
                 <div class="flashcard-back">
-                    <div class="flashcard-title">${flashcard.title}</div>
                     <div class="flashcard-content">${flashcard.back}</div>
                 </div>
             `;
@@ -961,6 +972,8 @@ class FlashcardManager {
             return;
         }
 
+        console.log('Excluindo flashcard:', flashcardId, 'do grupo:', this.currentGroup.id);
+
         try {
             const response = await fetch(`/groups/${this.currentGroup.id}/flashcards/${flashcardId}`, {
                 method: 'DELETE',
@@ -971,6 +984,8 @@ class FlashcardManager {
             
             if (response.ok) {
                 this.flashcards = this.flashcards.filter(f => f.id !== flashcardId);
+                // Também remover do array global de flashcards
+                this.allFlashcards = this.allFlashcards.filter(f => f.id !== flashcardId);
                 this.updateFlashcardsList();
                 const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
                 if (groupIndex !== -1) {
