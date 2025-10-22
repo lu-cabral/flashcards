@@ -12,11 +12,14 @@
     width: 100%;
     font-size: 1.1rem;
     text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
+    /* Alinha o texto ao topo e permite rolagem */
     min-height: 60px;
     padding: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+    word-break: break-word;
+    white-space: pre-line;
 }
 
 .flashcard-front .flashcard-content {
