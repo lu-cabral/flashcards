@@ -1,0 +1,32 @@
+{
+  "flashcards_1760982137851": [
+    {
+      "id": "1761042793476",
+      "title": "Conjunções",
+      "front": "Quais os principais tipos de conjunções coordenativas? Aponte exemplos de cada uma.",
+      "back": "1. Aditivas: e, nem, não só...mas também\n2. Adversativas: mas, porém, contudo, todavia, entretanto\n3. Alternativas: ou, ou...ou, ora, quer...quer\n4. Opositivas: mas, porém, contudo, todavia, entretanto, no entanto, só que\n5. Conclusivas: portanto, assim, por isso, então etc.\n6. Explicativas: pois, porque, porquanto, que",
+      "groupId": "1760982137851",
+      "reviewDates": [
+        "2025-10-22",
+        "2025-10-28",
+        "2025-11-04",
+        "2025-11-25"
+      ],
+      "dateCreated": "2025-10-21T10:33:13.476Z"
+    },
+    {
+      "id": "1761043780275",
+      "title": "Conjunções",
+      "front": "Dê ao menos um exemplo em que \"e\" pode ter um valor diferente do aditivo. ",
+      "back": "\"O carro quebrou e eu tive que ficar na rua.\" - Conclusivo, ter ficado na rua é consequência do carro ter quebrado\n\n\"O carro quebrou e choveu muito.\" - Aditivo, não há relação semântica de causa e consequência entre as orações",
+      "groupId": "1760982137851",
+      "reviewDates": [
+        "2025-10-22",
+        "2025-10-28",
+        "2025-11-04",
+        "2025-11-25"
+      ],
+      "dateCreated": "2025-10-21T10:49:40.275Z"
+    }
+  ]
+}
