@@ -87,79 +87,24 @@ class FlashcardManager {
         }
     }
 
-    async loadGroups() {
-        console.log('Carregando grupos');
-        try {
-            const response = await fetch('/groups');
-            console.log('Resposta do servidor:', response);
-            if (!response.ok) {
-                throw new Error('Erro ao carregar grupos do servidor');
-            }
-            const groupsData = await response.json();
-            console.log('Grupos carregados:', groupsData);
-            
-            if (Array.isArray(groupsData)) {
-                this.groups = groupsData;
-                console.log('Grupos atribuídos:', this.groups);
-                
-                // Carrega os flashcards de todos os grupos
-                this.allFlashcards = [];
-                for (const group of this.groups) {
-                    console.log(`Carregando flashcards do grupo ${group.id}`);
-                    try {
-                        const groupFlashcards = await this.loadGroupFlashcards(group.id);
-                        console.log(`Flashcards carregados do grupo ${group.id}:`, groupFlashcards);
-                        this.allFlashcards = [...this.allFlashcards, ...groupFlashcards];
-                    } catch (err) {
-                        console.error(`Erro ao carregar flashcards do grupo ${group.id}:`, err);
-                    }
-                }
-                console.log('Total de flashcards carregados:', this.allFlashcards.length);
-                
-                // Primeiro atualiza a lista de grupos
-                this.updateGroupsList();
-                // Depois aplica o filtro aos flashcards
-                this.filterFlashcards();
-            } else {
-                console.error('Resposta do servidor não é um array:', groupsData);
-            }
-        } catch (error) {
-            console.error('Erro ao carregar grupos:', error);
+    loadGroups() {
+        // Carrega grupos do localStorage
+        const groupsData = JSON.parse(localStorage.getItem('groups') || '[]');
+        this.groups = groupsData;
+        // Carrega todos os flashcards de todos os grupos
+        this.allFlashcards = [];
+        for (const group of this.groups) {
+            const groupFlashcards = this.loadGroupFlashcards(group.id);
+            this.allFlashcards = [...this.allFlashcards, ...groupFlashcards];
         }
+        this.updateGroupsList();
+        this.filterFlashcards();
     }
 
-    async loadGroupFlashcards(groupId) {
-        console.log(`Iniciando carregamento de flashcards do grupo ${groupId}`);
-        try {
-            const response = await fetch(`/groups/${groupId}/flashcards`);
-            console.log(`Resposta do servidor para grupo ${groupId}:`, response);
-            if (!response.ok) {
-                throw new Error(`Erro ao carregar flashcards do grupo ${groupId}`);
-            }
-            const files = await response.json();
-            console.log(`Arquivos de flashcards do grupo ${groupId}:`, files);
-            
-            const flashcards = [];
-            for (const file of files) {
-                if (!file.endsWith('.json')) continue;
-                const flashcardId = file.replace('.json', '');
-                console.log(`Carregando flashcard ${flashcardId}`);
-                const flashcardResponse = await fetch(`/flashcards/${flashcardId}`);
-                if (!flashcardResponse.ok) {
-                    console.error(`Erro ao carregar flashcard ${flashcardId}`);
-                    continue;
-                }
-                const flashcard = await flashcardResponse.json();
-                flashcard.groupId = groupId; // Adiciona o ID do grupo ao flashcard
-                flashcards.push(flashcard);
-            }
-            
-            console.log(`Flashcards carregados para o grupo ${groupId}:`, flashcards);
-            return flashcards;
-        } catch (error) {
-            console.error(`Erro ao carregar flashcards do grupo ${groupId}:`, error);
-            return [];
-        }
+    loadGroupFlashcards(groupId) {
+        // Carrega flashcards do grupo do localStorage
+        const flashcardsData = JSON.parse(localStorage.getItem(`flashcards_${groupId}`) || '[]');
+        return flashcardsData;
     }
 
     async filterGroups() {
@@ -314,8 +259,7 @@ class FlashcardManager {
         const colorInput = document.getElementById('groupColor');
         const color = colorInput && colorInput.value ? colorInput.value : '#4a90e2';
 
-        let group, url, method;
-        
+        let group;
         if (this.editingGroup) {
             const id = document.getElementById('groupId').value;
             group = {
@@ -325,8 +269,6 @@ class FlashcardManager {
                 color,
                 id
             };
-            url = `/groups/${id}`;
-            method = 'PUT';
         } else {
             group = {
                 name,
@@ -334,43 +276,29 @@ class FlashcardManager {
                 color,
                 dateCreated: new Date().toISOString()
             };
-            url = '/groups';
-            method = 'POST';
         }
 
         try {
             console.log('Salvando grupo:', group);
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(group)
-            });
-            
-            if (response.ok) {
-                const savedGroup = await response.json();
-                console.log('Grupo salvo com sucesso:', savedGroup);
-                
-                if (this.editingGroup) {
-                    // Atualiza o grupo existente
-                    const idx = this.groups.findIndex(g => g.id === savedGroup.id);
-                    if (idx !== -1) {
-                        this.groups[idx] = savedGroup;
-                    }
-                } else {
-                    // Adiciona o novo grupo
-                    this.groups.push(savedGroup);
+            let savedGroup;
+            if (this.editingGroup) {
+                // Atualiza o grupo existente
+                const idx = this.groups.findIndex(g => g.id === group.id);
+                if (idx !== -1) {
+                    this.groups[idx] = { ...this.groups[idx], ...group };
+                    savedGroup = this.groups[idx];
                 }
-                
-                // Recarrega todos os grupos para garantir sincronização
-                await this.loadGroups();
-                this.closeModal('group');
             } else {
-                const errorData = await response.json();
-                console.error('Erro ao salvar grupo:', errorData);
-                alert('Erro ao salvar grupo: ' + (errorData.error || 'Erro desconhecido'));
+                // Adiciona o novo grupo
+                group.id = Date.now().toString();
+                this.groups.push(group);
+                savedGroup = group;
             }
+            // Salva no localStorage
+            localStorage.setItem('groups', JSON.stringify(this.groups));
+            // Recarrega todos os grupos para garantir sincronização
+            this.loadGroups();
+            this.closeModal('group');
         } catch (error) {
             console.error('Erro ao salvar grupo:', error);
             alert('Erro ao salvar grupo.');
@@ -379,20 +307,19 @@ class FlashcardManager {
 
     async handleFlashcardSubmit(e) {
         e.preventDefault();
-        
+
         const title = document.getElementById('flashcardTitle').value;
         const front = document.getElementById('flashcardFront').value;
         const back = document.getElementById('flashcardBack').value;
-        
+
         const reviewDateInputs = document.querySelectorAll('.review-date-input');
         const reviewDates = Array.from(reviewDateInputs)
             .map(input => input.value)
             .filter(date => date && date.trim() !== '');
-        
+
         console.log('Salvando datas:', reviewDates);
 
-        let flashcard, url, method;
-        
+        let flashcard;
         if (this.editingFlashcard) {
             flashcard = {
                 ...this.editingFlashcard,
@@ -401,8 +328,6 @@ class FlashcardManager {
                 back,
                 reviewDates
             };
-            url = `/groups/${this.currentGroup.id}/flashcards/${flashcard.id}`;
-            method = 'PUT';
         } else {
             flashcard = {
                 id: Date.now().toString(),
@@ -413,46 +338,27 @@ class FlashcardManager {
                 reviewDates,
                 dateCreated: new Date().toISOString()
             };
-            url = `/groups/${this.currentGroup.id}/flashcards`;
-            method = 'POST';
         }
 
         try {
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(flashcard)
-            });
-            
-            if (response.ok) {
-                if (this.editingFlashcard) {
-                    const idx = this.flashcards.findIndex(f => f.id === flashcard.id);
-                    if (idx !== -1) {
-                        this.flashcards[idx] = flashcard;
-                    }
-                    // Atualizar também no array global
-                    const globalIdx = this.allFlashcards.findIndex(f => f.id === flashcard.id);
-                    if (globalIdx !== -1) {
-                        this.allFlashcards[globalIdx] = flashcard;
-                    }
-                } else {
-                    this.flashcards.push(flashcard);
-                    // Adicionar também ao array global
-                    this.allFlashcards.push(flashcard);
-                    // Atualizar contagem do grupo
-                    const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
-                    if (groupIndex !== -1) {
-                        this.groups[groupIndex].cardCount = (this.groups[groupIndex].cardCount || 0) + 1;
-                        this.updateGroupsList();
-                    }
+            let flashcards = this.loadGroupFlashcards(this.currentGroup.id);
+            let savedFlashcard;
+            if (this.editingFlashcard) {
+                // Atualiza flashcard existente
+                const idx = flashcards.findIndex(f => f.id === flashcard.id);
+                if (idx !== -1) {
+                    flashcards[idx] = { ...flashcards[idx], ...flashcard };
+                    savedFlashcard = flashcards[idx];
                 }
-                this.updateFlashcardsList();
-                this.closeModal('flashcard');
             } else {
-                alert('Erro ao salvar flashcard.');
+                // Adiciona novo flashcard
+                flashcards.push(flashcard);
+                savedFlashcard = flashcard;
             }
+            // Salva no localStorage
+            localStorage.setItem(`flashcards_${this.currentGroup.id}`, JSON.stringify(flashcards));
+            this.loadGroups();
+            this.closeModal('flashcard');
         } catch (error) {
             console.error('Erro ao salvar flashcard:', error);
             alert('Erro ao salvar flashcard.');
@@ -941,24 +847,15 @@ class FlashcardManager {
 
     async deleteGroup(groupId) {
         try {
-            const response = await fetch(`/groups/${groupId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                this.groups = this.groups.filter(g => g.id !== groupId);
-                this.updateGroupsList();
-                if (this.currentGroup && this.currentGroup.id === groupId) {
-                    this.flashcardsList.innerHTML = '';
-                    this.currentGroup = null;
-                    this.showGroups();
-                }
-            } else {
-                const error = await response.json();
-                alert(error.error || 'Erro ao excluir grupo.');
+            this.groups = this.groups.filter(g => g.id !== groupId);
+            localStorage.setItem('groups', JSON.stringify(this.groups));
+            // Remove os flashcards do grupo excluído
+            localStorage.removeItem(`flashcards_${groupId}`);
+            this.updateGroupsList();
+            if (this.currentGroup && this.currentGroup.id === groupId) {
+                this.flashcardsList.innerHTML = '';
+                this.currentGroup = null;
+                this.showGroups();
             }
         } catch (error) {
             console.error('Erro ao excluir grupo:', error);
@@ -975,26 +872,18 @@ class FlashcardManager {
         console.log('Excluindo flashcard:', flashcardId, 'do grupo:', this.currentGroup.id);
 
         try {
-            const response = await fetch(`/groups/${this.currentGroup.id}/flashcards/${flashcardId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                this.flashcards = this.flashcards.filter(f => f.id !== flashcardId);
-                // Também remover do array global de flashcards
-                this.allFlashcards = this.allFlashcards.filter(f => f.id !== flashcardId);
-                this.updateFlashcardsList();
-                const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
-                if (groupIndex !== -1) {
-                    this.groups[groupIndex].cardCount = (this.groups[groupIndex].cardCount || 1) - 1;
-                    this.updateGroupsList();
-                }
-            } else {
-                const error = await response.json();
-                alert(error.error || 'Erro ao excluir flashcard.');
+            let flashcards = this.loadGroupFlashcards(this.currentGroup.id);
+            flashcards = flashcards.filter(f => f.id !== flashcardId);
+            localStorage.setItem(`flashcards_${this.currentGroup.id}`, JSON.stringify(flashcards));
+            this.flashcards = flashcards;
+            // Também remover do array global de flashcards
+            this.allFlashcards = this.allFlashcards.filter(f => f.id !== flashcardId);
+            this.updateFlashcardsList();
+            const groupIndex = this.groups.findIndex(g => g.id === this.currentGroup.id);
+            if (groupIndex !== -1) {
+                this.groups[groupIndex].cardCount = (this.groups[groupIndex].cardCount || 1) - 1;
+                localStorage.setItem('groups', JSON.stringify(this.groups));
+                this.updateGroupsList();
             }
         } catch (error) {
             console.error('Erro ao excluir flashcard:', error);
